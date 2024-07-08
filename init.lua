@@ -104,9 +104,7 @@ local function on_ban_player(name, params, tempban)
 
 		local reason = reason or S("No reason given.")
 		minetest.log("action", "[myban] " .. name .. " bans " .. plname .. " with reason: " .. reason .. ".")
-		--if minetest.get_player_by_name(plname) then
-			minetest.kick_player(plname, reason)			
-		--end
+		minetest.kick_player(plname, reason)
 		return true, S("Banned @1.", plname)
 	end
 	if tempban then
@@ -178,4 +176,39 @@ minetest.register_on_prejoinplayer(function(name, ip)
 		end
 	end
 end)
+
+
+minetest.register_on_joinplayer(function(ObjectRef, last_login)
+	local name = ObjectRef:get_player_name()
+	if name and name ~= "" then
+		if last_login == nil then  -- New player?
+			local info = minetest.get_player_information(name)
+			local s = string.format("%25s: avg_rtt=%.3f, lang_code=%s, formspec=%u protocol=%u",
+				name, info.avg_rtt, info.lang_code, info.formspec_version, info.protocol_version)
+			minetest.log("warning", "[myban] " .. s)
+		end
+
+		if minetest.check_player_privs(name, "superminer") then
+			if NoNewState == "on" then
+				minetest.chat_send_player(name, string.char(0x1b) .. "(c@#ff0000)" .. 
+					"Info: 'nonew' is still active. You can deactivate 'nonew' with the command: /nonew off")
+			end
+		end
+	end
+end)
+
+minetest.register_chatcommand("getinfo", {
+	params = S("<name> "),
+	description = S("Output player information"),
+	privs = {superminer = true},
+	func = function(name, params)
+		local info = minetest.get_player_information(params)
+		if info then
+			local s = string.format("lag: %.3f s, lang_code: %2s, formspec: v%u, protocol: v%u",
+				info.avg_rtt, info.lang_code, info.formspec_version, info.protocol_version)
+			return true, "Info: " .. s
+		end
+		return false, "No valid player name"
+	end,
+})
 
