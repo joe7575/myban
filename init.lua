@@ -22,6 +22,7 @@ local S = minetest.get_translator("myban")
 local storage = minetest.get_mod_storage()
 local BanList = minetest.deserialize(storage:get_string("BanList")) or {}
 local NoNewState = storage:contains("NoNewState") and storage:get_string("NoNewState") or "off"
+local NewPlayerList = minetest.deserialize(storage:get_string("NewPlayerList")) or {}
 
 --local DAY_BAN_TIME  = 60*60*24     -- 1 day
 local DAY_BAN_TIME  = 60    -- 1 day
@@ -36,6 +37,7 @@ local function remove_expired_entries()
 	end
 	BanList = list
 	storage:set_string("BanList", minetest.serialize(BanList))
+	storage:set_string("NewPlayerList", minetest.serialize(NewPlayerList))
 
 	-- run every hour
 	minetest.after(3600, remove_expired_entries)
@@ -43,6 +45,13 @@ end
 
 minetest.after(100, remove_expired_entries)
 
+local function player_list()
+	local list = {}
+	for name, _ in pairs(NewPlayerList) do
+		table.insert(list, name)
+	end
+	return table.concat(list, ", ")
+end
 
 local function player_banned(name)
 	for _, item in ipairs(BanList) do
@@ -170,11 +179,12 @@ minetest.register_on_prejoinplayer(function(name, ip)
 	if player_banned(name) then
 		return ("You are banned!")
 	end
-	if NoNewState == "on" then
+	if NoNewState == "on" and not NewPlayerList[name] then
 		if not minetest.player_exists(name) then
-			return ("No new players allowed!")
+			return ("New registration only via email to: iauit@gmx.de")
 		end
 	end
+	NewPlayerList[name] = nil
 end)
 
 
@@ -212,3 +222,25 @@ minetest.register_chatcommand("getinfo", {
 	end,
 })
 
+minetest.register_chatcommand("newplayer", {
+	params = S("<name> "),
+	description = S("Add the name to the list of new players"),
+	privs = {superminer = true},
+	func = function(name, params)
+		if params and params ~= "" then
+			NewPlayerList[params] = true
+			storage:set_string("NewPlayerList", minetest.serialize(NewPlayerList))
+			return true, params .. " added"
+		end
+		return false, "No valid player name"
+	end,
+})
+
+minetest.register_chatcommand("newplayerlist", {
+	params = S("<name> "),
+	description = S("Output the list of new players"),
+	privs = {superminer = true},
+	func = function(name, params)
+		return true, player_list()
+	end,
+})
